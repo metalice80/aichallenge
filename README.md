@@ -6,7 +6,7 @@
 
 ## Возможности
 
-- Web UI с полем `Prompt` и кнопкой `Send`.
+- Web UI с полем `Prompt`, кнопкой `Send` и кнопкой `Clear`.
 - REST endpoint `POST /api/chat`.
 - Интеграция с OpenAI Responses API.
 - Настройка модели через `application.yml`.
@@ -67,7 +67,7 @@ $env:OPENAI_API_KEY="ваш-ключ"
 
 **http://localhost:8080/**
 
-Введите текст в поле `Prompt` и нажмите `Send`. Web UI отправит запрос в `POST /api/chat` и покажет ответ модели.
+Введите текст в поле `Prompt` и нажмите `Send`. Web UI отправит запрос в `POST /api/chat` и покажет ответ модели. Кнопка `Clear` очищает prompt и скрывает предыдущий ответ.
 
 ## Настройка модели
 

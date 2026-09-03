@@ -128,6 +128,11 @@ textarea:focus {
     font-size: 0.82rem;
 }
 
+.button-group {
+    display: flex;
+    gap: 10px;
+}
+
 button {
     display: inline-flex;
     min-width: 112px;
@@ -159,6 +164,19 @@ button:focus-visible {
 button:disabled {
     cursor: wait;
     opacity: 0.72;
+}
+
+.button-secondary {
+    color: var(--text);
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.button-secondary:hover:not(:disabled) {
+    color: var(--accent);
+    border-color: #b9cec4;
+    background: var(--accent-soft);
+    box-shadow: none;
 }
 
 .spinner {
@@ -239,6 +257,10 @@ button.is-loading .spinner {
     .form-actions {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .button-group {
+        width: 100%;
     }
 
     button {

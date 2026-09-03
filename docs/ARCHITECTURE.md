@@ -40,9 +40,9 @@ flowchart LR
 
 `src/main/resources/static/`
 
-- `index.html` — семантическая форма с Prompt, кнопкой Send и live region результата.
+- `index.html` — семантическая форма с Prompt, кнопками Send/Clear и live region результата.
 - `styles.css` — responsive layout и состояния формы/результата.
-- `app.js` — submit handler, same-origin `fetch`, loading state и показ success/error результата.
+- `app.js` — submit handler, same-origin `fetch`, loading state, очистка формы и показ success/error результата.
 
 Spring Boot раздаёт эти файлы как static resources. UI не имеет отдельной сборки, package manager или runtime. Ответы вставляются через `textContent`, а не `innerHTML`.
 
@@ -173,7 +173,7 @@ API versioning, authentication и authorization сейчас отсутству�
 - `ChatControllerTest` использует `@WebMvcTest`, MockMvc и mock `OpenAiResponsesClient`. Эти тесты фиксируют внешний HTTP-контракт и error mapping без реальной сети.
 - `OpenAiResponsesClientTest` связывает `MockRestServiceServer` с `RestClient.Builder`. Тесты фиксируют исходящий URL, метод, Authorization header, request JSON, разбор response JSON и безопасное логирование полей upstream error через `OutputCaptureExtension`.
 - Unit tests не требуют реального `OPENAI_API_KEY` и не обращаются к OpenAI.
-- Web UI проверяется browser smoke-сценарием против запущенного приложения и локального mock OpenAI: загрузка `/`, submit формы и отображение ответа.
+- Web UI проверяется browser smoke-сценарием против запущенного приложения и локального mock OpenAI: загрузка `/`, submit формы, отображение ответа и очистка prompt/result кнопкой Clear.
 
 Такое разделение проверяет обе HTTP-границы независимо и сохраняет тесты быстрыми и детерминированными.
 

@@ -1,6 +1,7 @@
 const form = document.querySelector("#chat-form");
 const promptInput = document.querySelector("#prompt");
 const sendButton = document.querySelector("#send-button");
+const clearButton = document.querySelector("#clear-button");
 const result = document.querySelector("#result");
 const resultStatus = document.querySelector("#result-status");
 const answer = document.querySelector("#answer");
@@ -44,6 +45,15 @@ form.addEventListener("submit", async (event) => {
     }
 });
 
+clearButton.addEventListener("click", () => {
+    form.reset();
+    answer.textContent = "";
+    resultStatus.textContent = "";
+    result.classList.remove("is-error");
+    result.hidden = true;
+    promptInput.focus();
+});
+
 async function readJson(response) {
     try {
         return await response.json();
@@ -54,6 +64,7 @@ async function readJson(response) {
 
 function setLoading(loading) {
     sendButton.disabled = loading;
+    clearButton.disabled = loading;
     sendButton.classList.toggle("is-loading", loading);
     sendButton.querySelector(".button-label").textContent = loading ? "Sending" : "Send";
     form.setAttribute("aria-busy", String(loading));
