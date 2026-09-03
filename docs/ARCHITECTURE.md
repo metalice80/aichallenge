@@ -4,26 +4,29 @@
 
 ## Общая схема
 
-Приложение — stateless HTTP backend в одном Spring Boot процессе.
+Приложение — stateless web-приложение в одном Spring Boot процессе. Тот же embedded server раздаёт статический UI и обслуживает REST API.
 
 ```mermaid
 flowchart LR
-    Caller[HTTP-клиент] -->|POST /api/chat| Controller[ChatController]
+    Browser[Браузер] -->|GET /| Static[Static Web UI]
+    Static -->|HTML / CSS / JavaScript| Browser
+    Browser -->|fetch POST /api/chat| Controller[ChatController]
+    ApiCaller[Другой HTTP-клиент] -->|POST /api/chat| Controller
     Controller --> Client[OpenAiResponsesClient]
     Client -->|POST /v1/responses| OpenAI[OpenAI Responses API]
     OpenAI --> Client
     Client --> Controller
-    Controller -->|ChatResponse JSON| Caller
+    Controller -->|ChatResponse JSON| Browser
     Controller -. exception .-> Advice[GlobalExceptionHandler]
     Client -. exception .-> Advice
-    Advice -->|ApiErrorResponse JSON| Caller
+    Advice -->|ApiErrorResponse JSON| Browser
     Config[application.yml + environment] --> Properties[OpenAiProperties]
     Properties --> Client
     Properties --> RestClient[RestClient bean]
     RestClient --> Client
 ```
 
-Нет базы данных, persistent storage, message broker, cache, отдельного frontend или внутренней микросервисной сети.
+Нет базы данных, persistent storage, message broker, cache или внутренней микросервисной сети.
 
 ## Основные компоненты
 
@@ -32,6 +35,16 @@ flowchart LR
 `src/main/java/com/example/chat/ChatApplication.java`
 
 Стандартная точка входа с `@SpringBootApplication`. Запускает embedded servlet container и Spring application context.
+
+### Web UI layer
+
+`src/main/resources/static/`
+
+- `index.html` — семантическая форма с Prompt, кнопкой Send и live region результата.
+- `styles.css` — responsive layout и состояния формы/результата.
+- `app.js` — submit handler, same-origin `fetch`, loading state и показ success/error результата.
+
+Spring Boot раздаёт эти файлы как static resources. UI не имеет отдельной сборки, package manager или runtime. Ответы вставляются через `textContent`, а не `innerHTML`.
 
 ### API layer
 
@@ -67,7 +80,7 @@ API-ключ не хранится в репозитории. Пустой defau
 
 `src/main/java/com/example/chat/openai/`
 
-- `OpenAiResponsesClient` формирует запрос, выполняет его и извлекает текст.
+- `OpenAiResponsesClient` формирует запрос, выполняет его, извлекает текст и безопасно логирует выбранные поля ошибочного ответа.
 - `OpenAiConfigurationException` означает отсутствие обязательной runtime-конфигурации.
 - `OpenAiApiException` хранит ошибочный HTTP-статус upstream.
 - `OpenAiServiceException` представляет transport, decoding и invalid-response ошибки.
@@ -95,6 +108,8 @@ output[] -> content[] -> элементы type=output_text -> text
 
 Все непустые `output_text` объединяются символом перевода строки. Если `output`, content или текст отсутствуют, клиент выбрасывает контролируемое исключение вместо возврата пустого успешного ответа.
 
+При ошибочном HTTP-статусе клиент десериализует только объект `error` и читает `x-request-id` из response headers. В WARN log записываются HTTP status, `error.message`, `error.type`, `error.code` и `x-request-id`. Полный upstream body и остальные headers не логируются. Перед записью текущий API-ключ, Bearer credentials и строки формата `sk-*` заменяются на `[REDACTED]`; CR/LF заменяются пробелами.
+
 ## Поток запроса
 
 1. HTTP-клиент отправляет JSON в `POST /api/chat`.
@@ -105,7 +120,8 @@ output[] -> content[] -> элементы type=output_text -> text
 6. `RestClient` отправляет модель и input в OpenAI Responses API.
 7. Клиент извлекает `output_text` и возвращает строку контроллеру.
 8. Контроллер сериализует `ChatResponse` в JSON.
-9. Любое поддерживаемое исключение перехватывает `GlobalExceptionHandler` и возвращает `ApiErrorResponse`.
+9. При ошибочном ответе OpenAI клиент безопасно логирует выбранные диагностические поля и выбрасывает `OpenAiApiException`.
+10. Любое поддерживаемое исключение перехватывает `GlobalExceptionHandler` и возвращает `ApiErrorResponse`.
 
 ## Публичный API
 
@@ -155,8 +171,9 @@ API versioning, authentication и authorization сейчас отсутству�
 ## Тестовая архитектура
 
 - `ChatControllerTest` использует `@WebMvcTest`, MockMvc и mock `OpenAiResponsesClient`. Эти тесты фиксируют внешний HTTP-контракт и error mapping без реальной сети.
-- `OpenAiResponsesClientTest` связывает `MockRestServiceServer` с `RestClient.Builder`. Тесты фиксируют исходящий URL, метод, Authorization header, request JSON и разбор response JSON.
+- `OpenAiResponsesClientTest` связывает `MockRestServiceServer` с `RestClient.Builder`. Тесты фиксируют исходящий URL, метод, Authorization header, request JSON, разбор response JSON и безопасное логирование полей upstream error через `OutputCaptureExtension`.
 - Unit tests не требуют реального `OPENAI_API_KEY` и не обращаются к OpenAI.
+- Web UI проверяется browser smoke-сценарием против запущенного приложения и локального mock OpenAI: загрузка `/`, submit формы и отображение ответа.
 
 Такое разделение проверяет обе HTTP-границы независимо и сохраняет тесты быстрыми и детерминированными.
 
@@ -177,6 +194,8 @@ OPENAI_API_KEY="..." ./gradlew bootRun
 
 Embedded web server слушает стандартный Spring Boot port `8080`, если он не переопределён runtime-конфигурацией.
 
+Статические ресурсы UI включаются в тот же boot jar и обслуживаются embedded web server на `/`; отдельный frontend deployment отсутствует.
+
 В репозитории отсутствуют:
 
 - Dockerfile и container image definition;
@@ -195,7 +214,9 @@ Embedded web server слушает стандартный Spring Boot port `8080
 - OpenAI — внешний upstream; его HTTP-статус и JSON не считаются гарантированно корректными.
 - Секрет существует только в runtime environment и используется в Authorization header.
 - `.env` исключён из Git. Приложение не реализует dotenv loader.
-- Upstream body и stack trace не возвращаются API-клиенту.
+- Upstream body и stack trace не возвращаются API-клиенту и не записываются целиком в log.
+- Из upstream error логируются только HTTP status, `error.message`, `error.type`, `error.code` и `x-request-id`; credentials редактируются до вызова logger.
+- UI выводит ответы и сообщения ошибок через `textContent`, поэтому текст модели не интерпретируется браузером как HTML.
 - Пользовательский текст передаётся стороннему OpenAI API; политика хранения/приватности пользовательских данных в проекте пока не определена.
 - Публичный endpoint не защищён authentication или rate limiting; это ограничение текущей реализации, а не предполагаемая защищённость.
 
@@ -205,6 +226,10 @@ Embedded web server слушает стандартный Spring Boot port `8080
 
 Причина: текущий контракт использует один endpoint и простую структуру запроса. Встроенный клиент уменьшает число зависимостей и оставляет wire contract явным. Если функциональность Responses API существенно расширится, решение следует пересмотреть на основании реального объёма mapping-кода.
 
+### Vanilla Web UI без frontend toolchain
+
+Причина: интерфейс содержит одну форму и один API-вызов. Обычные HTML/CSS/JavaScript не требуют React, Node.js, package manager, отдельной сборки или deployment-контура. UI и API работают с одного origin, поэтому дополнительная CORS-конфигурация не нужна.
+
 ### Records для DTO и properties
 
 Причина: объекты являются небольшими immutable data carriers без жизненного цикла и поведения.
@@ -212,6 +237,8 @@ Embedded web server слушает стандартный Spring Boot port `8080
 ### Централизованная обработка ошибок
 
 Причина: API всегда получает предсказуемый формат, контроллер не содержит повторяющегося exception mapping, внутренние детали не утекают наружу.
+
+Диагностика upstream-ошибок выполняется в `OpenAiResponsesClient`, где одновременно доступны response body и headers. Логируется фиксированный набор полей вместо полного ответа: это сохраняет `x-request-id` для обращения в поддержку и снижает риск утечки credentials или других данных.
 
 ### Запуск без API-ключа разрешён
 

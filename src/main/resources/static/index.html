@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A simple interface for the OpenAI Responses API">
+    <title>OpenAI Chat</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main class="page-shell">
+    <section class="chat-card" aria-labelledby="page-title">
+        <header class="chat-header">
+            <p class="eyebrow">OpenAI Responses API</p>
+            <h1 id="page-title">Ask the model</h1>
+            <p class="intro">Enter a prompt and receive a generated response.</p>
+        </header>
+
+        <form id="chat-form" class="chat-form">
+            <label for="prompt">Prompt</label>
+            <textarea
+                    id="prompt"
+                    name="prompt"
+                    rows="7"
+                    placeholder="What would you like to know?"
+                    autocomplete="off"
+                    required></textarea>
+
+            <div class="form-actions">
+                <p class="hint">Your prompt is sent to OpenAI.</p>
+                <button id="send-button" type="submit">
+                    <span class="button-label">Send</span>
+                    <span class="spinner" aria-hidden="true"></span>
+                </button>
+            </div>
+        </form>
+
+        <section id="result" class="result" aria-live="polite" hidden>
+            <div class="result-heading">
+                <p class="result-label">Response</p>
+                <span id="result-status" class="result-status"></span>
+            </div>
+            <div id="answer" class="answer"></div>
+        </section>
+    </section>
+</main>
+
+<script src="/app.js" defer></script>
+</body>
+</html>

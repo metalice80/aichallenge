@@ -2,7 +2,7 @@
 
 ## Назначение проекта
 
-`openai-chat` — минимальное серверное Spring Boot приложение, которое принимает сообщение через REST API, отправляет его в OpenAI Responses API и возвращает текст ответа. Текущая реализация не хранит историю диалога и не имеет пользовательского интерфейса.
+`openai-chat` — небольшое Spring Boot web-приложение: браузерный интерфейс принимает prompt, REST API отправляет его в OpenAI Responses API и возвращает текст ответа. Текущая реализация не хранит историю диалога.
 
 ## Технологический стек
 
@@ -13,6 +13,7 @@
 - Jakarta Bean Validation.
 - JUnit 5, AssertJ, Mockito, MockMvc и `MockRestServiceServer`.
 - OpenAI Responses API без стороннего OpenAI SDK.
+- Web UI на обычных HTML, CSS и JavaScript без frontend-фреймворка.
 
 ## Архитектурные принципы
 
@@ -26,12 +27,14 @@
 
 ## Структура проекта
 
+- `README.md` — пользовательское описание, инструкции запуска, Web UI и REST API.
 - `build.gradle.kts` — плагины, Java toolchain и зависимости.
 - `src/main/resources/application.yml` — имя приложения и свойства OpenAI.
 - `src/main/java/com/example/chat/ChatApplication.java` — точка входа.
 - `src/main/java/com/example/chat/api/` — REST-контроллер, публичные DTO и централизованный обработчик ошибок.
 - `src/main/java/com/example/chat/config/` — typed properties и создание `RestClient`.
 - `src/main/java/com/example/chat/openai/` — интеграция с Responses API и доменные исключения интеграции.
+- `src/main/resources/static/` — статический Web UI: `index.html`, `styles.css`, `app.js`.
 - `src/test/java/com/example/chat/api/` — тесты HTTP-контракта через MockMvc.
 - `src/test/java/com/example/chat/openai/` — тесты исходящих OpenAI-запросов и разбора ответов.
 - `docs/PROJECT_STATE.md` — актуальный снимок состояния и ограничений.
@@ -44,7 +47,7 @@
 3. DTO входа валидировать на HTTP-границе. Ошибки должны сохранять единый JSON-формат `ApiErrorResponse`.
 4. При изменении OpenAI-интеграции проверить сериализацию запроса, обязательные заголовки, HTTP-статусы и разбор массива `output[].content[]`.
 5. Для нового наблюдаемого поведения добавлять узкий unit test. HTTP-контракт тестировать через MockMvc, внешний HTTP-вызов — через `MockRestServiceServer`; unit tests не должны обращаться к реальному OpenAI API.
-6. Перед завершением существенного изменения выполнить как минимум `./gradlew test`. Для изменений запуска или HTTP-маршрутов дополнительно выполнить smoke-проверку запущенного приложения.
+6. Перед завершением существенного изменения выполнить как минимум `./gradlew test`. Изменения Web UI проверять в реальном браузере; для изменений запуска или HTTP-маршрутов дополнительно выполнить smoke-проверку запущенного приложения.
 7. Не коммитить артефакты `.gradle/`, `build/`, IDE-файлы и `.env`.
 8. После существенных изменений проекта агент обязан обновить `docs/PROJECT_STATE.md`. При изменении компонентов, потоков данных, публичного API, интеграций или иных архитектурных решений агент обязан обновить `docs/ARCHITECTURE.md`.
 
@@ -89,6 +92,7 @@ curl -X POST http://localhost:8080/api/chat \
 ## Постоянные факты и ограничения
 
 - Публичный endpoint: `POST /api/chat`.
+- Web UI доступен на `/` и обращается к `POST /api/chat` через same-origin `fetch`.
 - Текущая модель по умолчанию: `gpt-4.1-mini` в `application.yml`.
 - Внешний endpoint: `POST /v1/responses` относительно `openai.base-url`.
 - Успешный ответ собирается из элементов с типом `output_text`; несколько текстовых элементов объединяются переводом строки.

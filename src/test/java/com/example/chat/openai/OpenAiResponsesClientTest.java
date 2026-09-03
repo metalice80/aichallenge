@@ -6,17 +6,23 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withResourceNotFound;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.example.chat.config.OpenAiProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+@ExtendWith(OutputCaptureExtension.class)
 class OpenAiResponsesClientTest {
 
     private MockRestServiceServer server;
@@ -28,7 +34,8 @@ class OpenAiResponsesClientTest {
         server = MockRestServiceServer.bindTo(builder).build();
         client = new OpenAiResponsesClient(
                 builder.baseUrl("https://api.openai.com").build(),
-                new OpenAiProperties("https://api.openai.com", "test-key", "gpt-test"));
+                new OpenAiProperties("https://api.openai.com", "test-key", "gpt-test"),
+                new ObjectMapper());
     }
 
     @Test
@@ -58,14 +65,33 @@ class OpenAiResponsesClientTest {
     }
 
     @Test
-    void mapsOpenAiErrorStatusToApiException() {
+    void logsOpenAiErrorDetailsWithoutSecrets(CapturedOutput output) {
         server.expect(requestTo("https://api.openai.com/v1/responses"))
-                .andRespond(withResourceNotFound());
+                .andRespond(withStatus(HttpStatus.FORBIDDEN)
+                        .header("x-request-id", "req_123")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                {
+                                  "error": {
+                                    "message": "Credential test-key is not permitted",
+                                    "type": "request_forbidden",
+                                    "code": "unsupported_country_region_territory"
+                                  }
+                                }
+                                """));
 
         assertThatThrownBy(() -> client.createResponse("Hello"))
                 .isInstanceOf(OpenAiApiException.class)
-                .hasMessage("OpenAI API request failed with status 404");
+                .hasMessage("OpenAI API request failed with status 403");
         server.verify();
+        assertThat(output)
+                .contains(
+                        "http.status=403",
+                        "error.message=Credential [REDACTED] is not permitted",
+                        "error.type=request_forbidden",
+                        "error.code=unsupported_country_region_territory",
+                        "x-request-id=req_123")
+                .doesNotContain("test-key", "Authorization", "Bearer");
     }
 
     @Test
@@ -83,7 +109,8 @@ class OpenAiResponsesClientTest {
     void requiresApiKeyBeforeSendingRequest() {
         OpenAiResponsesClient clientWithoutKey = new OpenAiResponsesClient(
                 RestClient.create("https://api.openai.com"),
-                new OpenAiProperties("https://api.openai.com", "", "gpt-test"));
+                new OpenAiProperties("https://api.openai.com", "", "gpt-test"),
+                new ObjectMapper());
 
         assertThatThrownBy(() -> clientWithoutKey.createResponse("Hello"))
                 .isInstanceOf(OpenAiConfigurationException.class)

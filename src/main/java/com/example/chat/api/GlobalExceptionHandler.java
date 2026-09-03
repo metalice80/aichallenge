@@ -44,7 +44,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(OpenAiApiException.class)
     ResponseEntity<ApiErrorResponse> handleOpenAiApi(
             OpenAiApiException exception, HttpServletRequest request) {
-        LOGGER.warn("OpenAI API rejected a request with status {}", exception.getStatusCode());
         return response(HttpStatus.BAD_GATEWAY, exception.getMessage(), request);
     }
 
